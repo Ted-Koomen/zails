@@ -286,6 +286,13 @@ zig test src/your_file.zig
 ```
 
 ### 4. Submit Pull Request
+I recognize that AI-assisted tools (e.g., code generation, refactoring, documentation support) are increasingly common in software development. Contributors are welcome to use AI tools to assist in preparing pull requests, as long as they carefully review, validate, and take full responsibility for the submitted code.
+
+All contributions must meet the project's quality standards, including correctness, readability, maintainability, and appropriate test coverage. Submitting AI-generated code does not exempt contributors from understanding and being able to explain their changes.
+
+To maintain review quality pull requests containing more than 1,000 lines of changes (additions + deletions) will be automatically closed. If your work exceeds this threshold, please split it into smaller, logically scoped pull requests.
+
+By submitting a contribution, you acknowledge that you have reviewed all code (whether AI-assisted or not) and stand behind its correctness and quality.
 
 1. Commit your changes with clear messages:
 ```bash
