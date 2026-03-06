@@ -11,7 +11,7 @@
 - **NUMA-Aware** — Workers pinned to NUMA nodes/CPUs
 - **Protobuf Wire Format** — gRPC-style service registry with comptime routing
 - **Message Bus** — Lock-free pub/sub event system with entity-owned topics and zero-allocation typed field filtering
-- **UDP Feed Ingestion** — Comptime binary protocol generator for exchange connectivity (ITCH, MDP3, etc.)
+- **UDP Feed Ingestion** — Comptime binary protocol generator.
 - **ClickHouse ORM** — ActiveRecord-like models with fluent query builder
 - **Code Generators** — `zails create model/service/migration/scaffold`
 
