@@ -95,7 +95,7 @@ Transform Zerver into a high-performance **gRPC version of Rails** for Zig, comb
 
 **Status:** Complete
 
-- **Comptime BinaryProtocol Generator** — Define binary protocols with field type/offset/size; generates zero-cost parsers at compile time via `@Type` struct generation. Supports u8-u64, i8-i64, f32/f64, ASCII strings, raw bytes, configurable endianness.
+- **Comptime BinaryProtocol Generator** — Define binary protocols with field type/offset/size; generates zero-cost parsers at compile time via `@Type` struct generation. Supports u8-u64, i8-i64, f32/f64, ASCII strings, raw bytes. Per-field endianness configuration (`.big` default for network byte order, `.little` override per field) enables mixed-endian protocols common in exchange feeds.
 - **UdpListener** — Binds UDP sockets, joins multicast groups (`IP_ADD_MEMBERSHIP`), non-blocking recv loop with comptime `inline for` dispatch to matching parser. Stack-allocated parse and JSON serialize buffers (zero allocation in parse path, one allocation per event for bus ownership).
 - **FeedManager** — Manages multiple listener threads from runtime config. Spawn/join lifecycle, aggregate stats across all feeds.
 - **Sequence Tracker** — Lock-free gap detection and duplicate detection using atomics. Tracks expected sequence, counts gaps/duplicates/total checked.
@@ -201,6 +201,12 @@ Transform Zerver into a high-performance **gRPC version of Rails** for Zig, comb
 - Pin feed listener threads to specific NUMA nodes
 - Dedicated recv buffer pools per NUMA node
 - Affinity between feed threads and bus worker threads
+
+#### 8.6 Kernel Bypass NIC (AF_XDP / DPDK)
+- **AF_XDP** — Zero-copy packet delivery from NIC to userspace via XDP sockets. Eliminates kernel network stack overhead (~400µs on loopback). Configurable per-feed: standard UDP socket or AF_XDP socket via `FeedConfig.transport` field. Requires BPF program to steer packets to XDP socket.
+- **DPDK** — Full kernel bypass with poll-mode drivers for sub-10µs receive latency. Dedicated CPU cores for packet polling (no interrupts). Direct DMA from NIC to application buffers. Requires dedicated NIC and hugepage memory allocation.
+- **Configuration** — Runtime transport selection per feed: `.kernel` (default, standard `recvfrom`), `.af_xdp` (zero-copy, requires XDP-capable NIC), `.dpdk` (full bypass, requires dedicated NIC and DPDK drivers). Compile-time protocol parsing is transport-agnostic — same `BinaryProtocol` definitions work regardless of how bytes arrive.
+- **Target latency** — AF_XDP: < 5µs receive. DPDK: < 1µs receive. Current kernel UDP: ~50µs receive.
 
 ---
 
