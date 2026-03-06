@@ -1,3 +1,31 @@
+  root_module.addImport("handlers", handlers_module);
+    root_module.addImport("result", result_module);
+
+    // Main server executable
+    const exe = b.addExecutable(.{
+        .name = "server",
+        .root_module = root_module,
+    });
+
+    b.installArtifact(exe);
+
+    // Run command
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
+
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+    }
+
+    const run_step = b.step("run", "Run the server");
+    run_step.dependOn(&run_cmd.step);
+
+    // Client executable
+    const client_module = b.createModule(.{
+        .root_source_file = b.path("src/client.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const client_exe = b.addExecutable(.{
         .name = "client",
@@ -48,31 +76,7 @@
     });
 
     const run_message_bus_tests = b.addRunArtifact(message_bus_tests);
-    const message_bus_test_step = b.step("test-message-bus", "Run message bus module tests (including event_builder)");
-    message_bus_test_step.dependOn(&run_message_bus_tests.step);
 
-    // Zails CLI tool
-    const zails_module = b.createModule(.{
-        .root_source_file = b.path("src/zails.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const zails_exe = b.addExecutable(.{
-        .name = "zails",
-        .root_module = zails_module,
-    });
-
-    b.installArtifact(zails_exe);
-
-    // Build only the CLI (for cross-platform releases)
-    const cli_step = b.step("cli", "Build only the zails CLI");
-    cli_step.dependOn(&b.addInstallArtifact(zails_exe, .{}).step);
-
-    const zails_run_cmd = b.addRunArtifact(zails_exe);
-    zails_run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args| {
         zails_run_cmd.addArgs(args);
     }
 
