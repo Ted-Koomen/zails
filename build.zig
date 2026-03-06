@@ -1,58 +1,3 @@
-const std = @import("std");
-
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-
-    // Create shared result module (used by both root and handlers)
-    const result_module = b.createModule(.{
-        .root_source_file = b.path("src/result.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    // Create handlers module
-    const handlers_module = b.createModule(.{
-        .root_source_file = b.path("handlers/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    handlers_module.addImport("result", result_module);
-
-    // Create root module with handlers import
-    const root_module = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    root_module.addImport("handlers", handlers_module);
-    root_module.addImport("result", result_module);
-
-    // Main server executable
-    const exe = b.addExecutable(.{
-        .name = "server",
-        .root_module = root_module,
-    });
-
-    b.installArtifact(exe);
-
-    // Run command
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    const run_step = b.step("run", "Run the server");
-    run_step.dependOn(&run_cmd.step);
-
-    // Client executable
-    const client_module = b.createModule(.{
-        .root_source_file = b.path("src/client.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
 
     const client_exe = b.addExecutable(.{
         .name = "client",
@@ -119,6 +64,10 @@ pub fn build(b: *std.Build) void {
     });
 
     b.installArtifact(zails_exe);
+
+    // Build only the CLI (for cross-platform releases)
+    const cli_step = b.step("cli", "Build only the zails CLI");
+    cli_step.dependOn(&b.addInstallArtifact(zails_exe, .{}).step);
 
     const zails_run_cmd = b.addRunArtifact(zails_exe);
     zails_run_cmd.step.dependOn(b.getInstallStep());
