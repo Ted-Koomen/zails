@@ -2,21 +2,91 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const proto = @import("proto.zig");
 
-/// Event payload for message bus
+// Max number of fields that can be filtered per event
+pub const MAX_EVENT_FIELDS = 8;
+
+// Stack alloc string for field values
+pub const FixedString = struct {
+    buf: [64]u8 = undefined,
+    len: u8 = 0,
+    pub fn init(s: []const u8) FixedString {
+        var fs = FixedString{};
+        const copy_len: u8 = @intCast(@min(s.len, 64));
+        @memcpy(fs.buf[0..copy_len], s[0..copy_len]);
+        fs.len = copy_len;
+        return fs;
+    }
+
+    pub fn slice(self: *const FixedString) []const u8 {
+        return self.buf[0..self.len];
+    }
+};
+
+// currently limited to basic types TODO: think about how we can have more complex types as values
+pub const FieldValue = union(enum) { none, int: i64, uint: u64, float: f64, string: FixedString, boolean: bool };
+
+pub const Field = struct {
+    name: [32]u8 = undefined,
+    name_len: u8 = 0,
+    value: FieldValue = .none,
+
+    pub fn init(field_name: []const u8, val: FieldValue) Field {
+        var f = Field{};
+        const copy_len: u8 = @intCast(@min(field_name.len, 32));
+        @memcpy(f.name[0..copy_len], field_name[0..copy_len]);
+        f.name_len = copy_len;
+        f.value = val;
+        return f;
+    }
+
+    pub fn nameSlice(self: *const Field) []const u8 {
+        return self.name[0..self.name_len];
+    }
+};
+
+// Event payload for message bus
 ///
 /// Memory ownership:
 /// - Events created with initOwned() own their string data and must call deinit()
 /// - Events created with struct literal syntax don't own data (caller manages lifetime)
 /// - Check 'owned' field to determine if deinit() should be called
 pub const Event = struct {
-    id: u128, // UUID (generated with std.Random)
-    timestamp: i64, // Unix timestamp microseconds
+    id: u128, 
+    timestamp: i64, 
     event_type: EventType,
-    topic: []const u8, // "Trade.created", "Trade.updated", etc.
-    model_type: []const u8, // "Trade", "Portfolio", etc.
+    topic: []const u8, 
+    model_type: []const u8,
     model_id: u64,
-    data: []const u8, // Serialized model state (protobuf)
-    owned: bool = false, // If true, this Event owns its string data
+    data: []const u8, 
+    owned: bool = false, 
+
+
+    fields: [MAX_EVENT_FIELDS]Field = [_]Field{.{}} ** MAX_EVENT_FIELDS,
+    field_count: u8 = 0,
+
+
+    pub fn getField(self: *const Event, name: []const u8) ?FieldValue {
+        for (self.fields[0..self.field_count]) |*f| {
+            if (std.mem.eql(u8, f.nameSlice(), name)) {
+                return f.value;
+            }
+        }
+        return null;
+    }
+
+    pub fn setField(self: *Event, name: []const u8, value: FieldValue) void {
+  
+        for (self.fields[0..self.field_count]) |*f| {
+            if (std.mem.eql(u8, f.nameSlice(), name)) {
+                f.value = value;
+                return;
+            }
+        }
+        if (self.field_count < MAX_EVENT_FIELDS) {
+            self.fields[self.field_count] = Field.init(name, value);
+            self.field_count += 1;
+        }
+    }
 
     pub const EventType = enum(u8) {
         model_created = 0,
@@ -25,7 +95,7 @@ pub const Event = struct {
         custom = 255,
     };
 
-    /// Create an event that owns its data (allocates copies)
+
     pub fn initOwned(
         allocator: Allocator,
         event_type: EventType,
@@ -93,7 +163,7 @@ pub const Event = struct {
         return buffer[0..pos];
     }
 
-    /// Deserialize event from protobuf
+
     pub fn deserialize(pb_data: []const u8, allocator: Allocator) !Event {
         var event = Event{
             .id = 0,
@@ -103,10 +173,8 @@ pub const Event = struct {
             .model_type = "",
             .model_id = 0,
             .data = "",
-            .owned = false, // Only set to true after all allocations succeed
+            .owned = false, 
         };
-
-        // Track allocations for cleanup on error
         var topic_allocated: ?[]const u8 = null;
         errdefer if (topic_allocated) |t| allocator.free(t);
         var model_type_allocated: ?[]const u8 = null;
@@ -117,7 +185,6 @@ pub const Event = struct {
         var pos: usize = 0;
 
         while (pos < pb_data.len) {
-            // Read tag
             const tag_result = try proto.decodeVarint(pb_data[pos..]);
             pos += tag_result.bytes_read;
 
@@ -125,7 +192,7 @@ pub const Event = struct {
             const wire_type = @as(u3, @intCast(tag_result.value & 0x7));
 
             switch (field_number) {
-                1 => { // id (bytes)
+                1 => { 
                     if (wire_type != @intFromEnum(proto.WireType.length_delimited)) return error.InvalidWireType;
                     const len_result = try proto.decodeVarint(pb_data[pos..]);
                     pos += len_result.bytes_read;
@@ -222,7 +289,6 @@ pub const Event = struct {
             }
         }
 
-        // All allocations succeeded - mark as owned
         event.owned = true;
         return event;
     }
@@ -236,7 +302,7 @@ pub const Event = struct {
     }
 };
 
-/// Generate unique event ID using random UUID (v4)
+
 pub fn generateEventId() u128 {
     var seed: [16]u8 = undefined;
     std.crypto.random.bytes(&seed);
