@@ -12,13 +12,9 @@ jobs:
   build:
     strategy:
       matrix:
-        include:
-          - target: x86_64-linux
-            os: ubuntu-latest
-          - target: aarch64-macos
-            os: macos-latest
+        target: [x86_64-linux, aarch64-macos]
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -28,8 +24,8 @@ jobs:
         with:
           version: 0.15.2
 
-      - name: Build
-        run: zig build -Dtarget=${{ matrix.target }} -Doptimize=ReleaseFast
+      - name: Build CLI
+        run: zig build cli -Dtarget=${{ matrix.target }} -Doptimize=ReleaseFast
 
       - name: Package
         run: tar -czf zails-${{ matrix.target }}.tar.gz -C zig-out/bin zails
